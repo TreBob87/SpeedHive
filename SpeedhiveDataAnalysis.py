@@ -3,8 +3,10 @@ import tkinter as tk
 from tkinter import messagebox, scrolledtext
 import json
 import re
+import threading
 
-auto_update_interval = 5000  # Auto-update interval in milliseconds (5 seconds)
+
+auto_update_interval = 30000  # Auto-update interval in milliseconds (30 seconds)
 auto_update_running = False  # Flag to track if auto-update is running
 
 # Function to parse lap time and handle invalid entries or times over 2 minutes
@@ -82,14 +84,17 @@ def fetch_race_data(event_id, session_id):
                 race_id_map[el['nam']] = {'lap_times': lap_times, 'best_time': best_time}
             except requests.HTTPError as e:
                 if e.response.status_code == 404:
+                    # Log the missing competitor and continue
+                    print(f"Competitor data not found for ID {el['id']}, skipping.")
                     continue
                 else:
                     # For other HTTP errors, re-raise the exception
                     raise
-        return race_id_map
+        return race_id_map, None
     except requests.RequestException as e:
-        messagebox.showerror("Error", f"Error fetching race data: {str(e)}")
-        return None
+        # Return None and the error message
+        return None, str(e)
+
 
 
 
@@ -114,26 +119,53 @@ def display_race_results(race_id_map, laps, method, result_text_widget):
     result_text_widget.insert(tk.END, result_str)
     result_text_widget.config(state=tk.DISABLED)
 
-# Function to start automatic updates
+def process_data(auto_update):
+    event_id = event_id_entry.get()
+    session_id = session_id_entry.get()
+    method = method_var.get()
+    try:
+        laps = int(laps_entry.get())
+    except ValueError:
+        root.after(0, lambda: messagebox.showerror("Error", "Please enter a valid number of laps."))
+        root.after(0, lambda: loading_label.config(text=""))
+        return
+    if not event_id or not session_id or method not in ['best', 'last']:
+        root.after(0, lambda: messagebox.showerror("Error", "All fields must be filled correctly."))
+        root.after(0, lambda: loading_label.config(text=""))
+        return
+    race_id_map, error_message = fetch_race_data(event_id, session_id)
+    if race_id_map:
+        # Update the GUI in the main thread
+        root.after(0, lambda: display_race_results(race_id_map, laps, method, result_text))
+    else:
+        if error_message:
+            root.after(0, lambda: messagebox.showerror("Error", f"Error fetching race data: {error_message}"))
+    # Clear the loading message
+    root.after(0, lambda: loading_label.config(text=""))
+
+def on_submit(auto_update=False):
+    global loading_label
+    # Set loading message
+    loading_label.config(text="Loading...")
+    # Start a new thread for data fetching and processing
+    threading.Thread(target=process_data, args=(auto_update,)).start()
+
 def start_auto_update():
     global auto_update_running
     auto_update_running = True
     auto_update()
 
-# Function to stop automatic updates
 def stop_auto_update():
     global auto_update_running
     auto_update_running = False
 
-# Function to automatically update data at intervals
 def auto_update():
     if auto_update_running:
         on_submit(auto_update=True)
         root.after(auto_update_interval, auto_update)
 
-# Tkinter-based desktop app
 def main():
-    global event_id_entry, session_id_entry, method_var, laps_entry, result_text, root
+    global event_id_entry, session_id_entry, method_var, laps_entry, result_text, root, loading_label
     root = tk.Tk()
     root.title("Lap Timer App")
 
@@ -159,13 +191,13 @@ def main():
     laps_entry.grid(row=3, column=1, padx=10, pady=10)
 
     # Result display with a scrollable text widget (monospaced font)
-    result_text = scrolledtext.ScrolledText(root, height=15, width=80, font=("Courier", 10))
+    result_text = scrolledtext.ScrolledText(root, height=20, width=80, font=("Courier", 10))
     result_text.grid(row=5, columnspan=3, padx=10, pady=10)
     result_text.config(state=tk.DISABLED)
 
     # Submit button
     submit_button = tk.Button(root, text="Submit", command=lambda: on_submit(auto_update=False))
-    submit_button.grid(row=4, columnspan=1, pady=20)
+    submit_button.grid(row=4, column=0, pady=20)
 
     # Start Auto-Update button
     start_button = tk.Button(root, text="Start Auto-Update", command=start_auto_update)
@@ -175,24 +207,11 @@ def main():
     stop_button = tk.Button(root, text="Stop Auto-Update", command=stop_auto_update)
     stop_button.grid(row=4, column=2, padx=10, pady=20)
 
-    root.mainloop()
+    # Loading label (initially empty)
+    loading_label = tk.Label(root, text="")
+    loading_label.grid(row=6, columnspan=3, pady=10)
 
-# Submit data fetch and display logic, shared between manual and auto-update
-def on_submit(auto_update=False):
-    event_id = event_id_entry.get()
-    session_id = session_id_entry.get()
-    method = method_var.get()
-    try:
-        laps = int(laps_entry.get())
-    except ValueError:
-        messagebox.showerror("Error", "Please enter a valid number of laps.")
-        return
-    if not event_id or not session_id or method not in ['best', 'last']:
-        messagebox.showerror("Error", "All fields must be filled correctly.")
-        return
-    race_id_map = fetch_race_data(event_id, session_id)
-    if race_id_map:
-        display_race_results(race_id_map, laps, method, result_text)
+    root.mainloop()
 
 if __name__ == "__main__":
     main()
