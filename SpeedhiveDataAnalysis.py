@@ -169,49 +169,56 @@ def main():
     root = tk.Tk()
     root.title("Lap Timer App")
 
+    # Configure grid weights
+    root.grid_rowconfigure(5, weight=1)  # Make row 5 (result_text) expandable
+    root.grid_columnconfigure(0, weight=1)  # Make column 0 expandable
+    root.grid_columnconfigure(1, weight=1)  # Make column 1 expandable
+    root.grid_columnconfigure(2, weight=1)  # Make column 2 expandable
+
     # Event ID
-    tk.Label(root, text="Enter the event ID:").grid(row=0, column=0, padx=10, pady=10)
+    tk.Label(root, text="Enter the event ID:").grid(row=0, column=0, padx=10, pady=10, sticky="w")
     event_id_entry = tk.Entry(root)
-    event_id_entry.grid(row=0, column=1, padx=10, pady=10)
+    event_id_entry.grid(row=0, column=1, columnspan=2, padx=10, pady=10, sticky="ew")
 
     # Session ID
-    tk.Label(root, text="Enter the session ID:").grid(row=1, column=0, padx=10, pady=10)
+    tk.Label(root, text="Enter the session ID:").grid(row=1, column=0, padx=10, pady=10, sticky="w")
     session_id_entry = tk.Entry(root)
-    session_id_entry.grid(row=1, column=1, padx=10, pady=10)
+    session_id_entry.grid(row=1, column=1, columnspan=2, padx=10, pady=10, sticky="ew")
 
     # Method: best or last
-    tk.Label(root, text="Calculate average for:").grid(row=2, column=0, padx=10, pady=10)
+    tk.Label(root, text="Calculate average for:").grid(row=2, column=0, padx=10, pady=10, sticky="w")
     method_var = tk.StringVar(value="best")
     tk.Radiobutton(root, text="Best Laps", variable=method_var, value="best").grid(row=2, column=1, sticky="w")
     tk.Radiobutton(root, text="Last Laps", variable=method_var, value="last").grid(row=2, column=2, sticky="w")
 
     # Number of laps
-    tk.Label(root, text="How many laps to consider?").grid(row=3, column=0, padx=10, pady=10)
+    tk.Label(root, text="How many laps to consider?").grid(row=3, column=0, padx=10, pady=10, sticky="w")
     laps_entry = tk.Entry(root)
-    laps_entry.grid(row=3, column=1, padx=10, pady=10)
-
-    # Result display with a scrollable text widget (monospaced font)
-    result_text = scrolledtext.ScrolledText(root, height=20, width=80, font=("Courier", 10))
-    result_text.grid(row=5, columnspan=3, padx=10, pady=10)
-    result_text.config(state=tk.DISABLED)
+    laps_entry.grid(row=3, column=1, columnspan=2, padx=10, pady=10, sticky="ew")
 
     # Submit button
     submit_button = tk.Button(root, text="Submit", command=lambda: on_submit(auto_update=False))
-    submit_button.grid(row=4, column=0, pady=20)
+    submit_button.grid(row=4, column=0, pady=20, sticky="ew")
 
     # Start Auto-Update button
     start_button = tk.Button(root, text="Start Auto-Update", command=start_auto_update)
-    start_button.grid(row=4, column=1, padx=10, pady=20)
+    start_button.grid(row=4, column=1, padx=10, pady=20, sticky="ew")
 
     # Stop Auto-Update button
     stop_button = tk.Button(root, text="Stop Auto-Update", command=stop_auto_update)
-    stop_button.grid(row=4, column=2, padx=10, pady=20)
+    stop_button.grid(row=4, column=2, padx=10, pady=20, sticky="ew")
+
+    # Result display with a scrollable text widget (monospaced font)
+    result_text = scrolledtext.ScrolledText(root, font=("Courier", 10))
+    result_text.grid(row=5, column=0, columnspan=3, padx=10, pady=10, sticky="nsew")
+    result_text.config(state=tk.DISABLED)
 
     # Loading label (initially empty)
     loading_label = tk.Label(root, text="")
-    loading_label.grid(row=6, columnspan=3, pady=10)
+    loading_label.grid(row=6, column=0, columnspan=3, pady=10, sticky="ew")
 
     root.mainloop()
+
 
 if __name__ == "__main__":
     main()
