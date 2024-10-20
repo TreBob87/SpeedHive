@@ -2,13 +2,14 @@ import requests
 import tkinter as tk
 from tkinter import messagebox, scrolledtext
 import json
+import re
 
 auto_update_interval = 5000  # Auto-update interval in milliseconds (5 seconds)
 auto_update_running = False  # Flag to track if auto-update is running
 
 # Function to parse lap time and handle invalid entries or times over 2 minutes
 def parse_lap_time(lap_time):
-    import re
+
     if not re.match(r'^\d+:\d{2}\.\d{3}$|^\d+\.\d{3}$', lap_time):
         return None  # Skip invalid lap times
     if ':' in lap_time:
@@ -65,16 +66,32 @@ def fetch_race_data(event_id, session_id):
         race_id_map = {}
         for el in race_data:
             competitor_url = f"https://lt-api.speedhive.com/api/events/{event_id}/sessions/{session_id}/competitor/{el['id']}"
-            competitor_response = requests.get(competitor_url, headers=headers)
-            competitor_response.raise_for_status()
-            competitor_data = competitor_response.json()
-            lap_times = [result['lsTm'] for result in competitor_data['results'] if parse_lap_time(result['lsTm']) is not None]
-            best_time = next((result['btTm'] for result in competitor_data['results'] if 'btTm' in result), None)
-            race_id_map[el['nam']] = {'lap_times': lap_times, 'best_time': best_time}
+            try:
+                competitor_response = requests.get(competitor_url, headers=headers)
+                competitor_response.raise_for_status()
+                competitor_data = competitor_response.json()
+                lap_times = [
+                    result['lsTm']
+                    for result in competitor_data['results']
+                    if 'lsTm' in result and parse_lap_time(result['lsTm']) is not None
+                ]
+                best_time = next(
+                    (result['btTm'] for result in competitor_data['results'] if 'btTm' in result),
+                    None
+                )
+                race_id_map[el['nam']] = {'lap_times': lap_times, 'best_time': best_time}
+            except requests.HTTPError as e:
+                if e.response.status_code == 404:
+                    continue
+                else:
+                    # For other HTTP errors, re-raise the exception
+                    raise
         return race_id_map
     except requests.RequestException as e:
         messagebox.showerror("Error", f"Error fetching race data: {str(e)}")
         return None
+
+
 
 # Function to display race results in a Text widget
 def display_race_results(race_id_map, laps, method, result_text_widget):
@@ -86,7 +103,7 @@ def display_race_results(race_id_map, laps, method, result_text_widget):
         if avg_lap_time is not None:
             results.append((name, avg_lap_time, best_time))
     results.sort(key=lambda x: x[1])
-    name_column_width = 10
+    name_column_width = 20
     result_str = "{:<10} {:<20} {:>20} {:>20}\n".format("Position", "Name", "Average Lap Time", "Best Time")
     result_str += "-" * 80 + "\n"
     for i, (name, avg_lap_time, best_time) in enumerate(results):
